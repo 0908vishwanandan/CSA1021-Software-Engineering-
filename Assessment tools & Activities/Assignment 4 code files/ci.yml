@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: 
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: 
+          name: test-report
+          path: test-results.xml
+
+  package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      # gate: skipped if any test fails
+      - uses: actions/checkout@v4
+      - run: docker build -t campus-backend:${{ github.sha }} .
+      - run: ./scripts/smoke-test.sh
